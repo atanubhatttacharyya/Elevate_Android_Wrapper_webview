@@ -1,0 +1,30 @@
+workflows:
+  android-debug:
+    name: Elevate Android WebView Debug APK
+    max_build_duration: 30
+    instance_type: mac_mini_m2
+    environment:
+      java: 17
+    scripts:
+      - name: Check toolchain
+        script: |
+          java -version
+          gradle --version
+      - name: Build WebView debug APK
+        script: |
+          gradle --no-daemon assembleDebug
+    artifacts:
+      - app/build/outputs/apk/debug/*.apk
+
+  android-release-unsigned:
+    name: Elevate Android WebView Release Bundle (unsigned)
+    max_build_duration: 30
+    instance_type: mac_mini_m2
+    environment:
+      java: 17
+    scripts:
+      - name: Build release bundle
+        script: |
+          gradle --no-daemon bundleRelease
+    artifacts:
+      - app/build/outputs/bundle/release/*.aab

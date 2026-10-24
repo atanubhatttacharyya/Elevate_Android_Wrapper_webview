@@ -1,0 +1,25 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.elevate.optiontrading'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.elevate.optiontrading'
+        minSdk 23
+        targetSdk 35
+        versionCode 2
+        versionName '2.0.0-webview'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'com.google.android.gms:play-services-auth:21.3.0'
+}
