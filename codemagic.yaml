@@ -35,6 +35,8 @@ workflows:
     instance_type: mac_mini_m2
     environment:
       java: 17
+      groups:
+        - elevate
     scripts:
       - name: Generate permanent keystore
         script: |
