@@ -29,25 +29,29 @@ workflows:
     artifacts:
       - app/build/outputs/bundle/release/*.aab
 
-  android-release-apk:
-    name: Elevate Android WebView Signed Release APK
+  generate-release-keystore-once:
+    name: Generate Elevate Release Keystore - One Time Only
     max_build_duration: 30
     instance_type: mac_mini_m2
     environment:
       java: 17
-      android_signing:
-        - elevate_release_key
     scripts:
-      - name: Verify persistent release signing key
+      - name: Generate permanent keystore
         script: |
           set -euo pipefail
-          : "${CM_KEYSTORE_PATH:?Upload a persistent keystore and set CM_KEYSTORE_PATH}"
-          : "${CM_KEYSTORE_PASSWORD:?Set CM_KEYSTORE_PASSWORD as a secure variable}"
-          : "${CM_KEY_ALIAS:?Set CM_KEY_ALIAS as a secure variable}"
-          : "${CM_KEY_PASSWORD:?Set CM_KEY_PASSWORD as a secure variable}"
-          test -f "$CM_KEYSTORE_PATH"
-      - name: Build signed release APK
-        script: |
-          gradle --no-daemon assembleRelease
+          mkdir -p "$CM_BUILD_DIR/keystore"
+          keytool -genkeypair \
+            -keystore "$CM_BUILD_DIR/keystore/elevate-release.jks" \
+            -storetype JKS \
+            -alias elevate_release_key \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Elevate Android Release, OU=Mobile, O=Elevate, L=Kolkata, ST=West Bengal, C=IN" \
+            -storepass "$ELEVATE_KEYSTORE_PASSWORD" \
+            -keypass "$ELEVATE_KEY_PASSWORD"
+          keytool -list \
+            -keystore "$CM_BUILD_DIR/keystore/elevate-release.jks" \
+            -storepass "$ELEVATE_KEYSTORE_PASSWORD"
     artifacts:
-      - app/build/outputs/apk/release/*.apk
+      - keystore/elevate-release.jks
