@@ -31,13 +31,17 @@ import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.common.api.CommonStatusCodes;
 
 import org.json.JSONObject;
+import org.json.JSONException;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -46,6 +50,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import javax.net.ssl.SSLException;
 
 /**
  * Elevate WebView shell with native Google Identity sign-in.
@@ -294,8 +299,24 @@ public class MainActivity extends Activity {
             } else {
                 showNativeResult(mode, false, "Unknown Google sign-in action.", null);
             }
-        } catch (Exception ex) {
-            showNativeResult(mode, false, "Unable to contact Elevate securely. Check your internet connection and try again.", null);
+        } catch (SSLException ex) {
+            Log.e("ElevateAuth", "TLS connection to Elevate failed", ex);
+            showNativeResult(mode, false, "Secure connection to Elevate failed (TLS). Check the phone's date/time and network, then retry.", null);
+        } catch (UnknownHostException ex) {
+            Log.e("ElevateAuth", "Elevate hostname could not be resolved", ex);
+            showNativeResult(mode, false, "Could not find Elevate on this network. Check internet or DNS, then retry.", null);
+        } catch (SocketTimeoutException ex) {
+            Log.e("ElevateAuth", "Elevate authentication request timed out", ex);
+            showNativeResult(mode, false, "Elevate did not respond in time. Check the connection and retry.", null);
+        } catch (IOException ex) {
+            Log.e("ElevateAuth", "Elevate authentication network request failed", ex);
+            showNativeResult(mode, false, "Elevate could not complete the sign-in request (network I/O). Check the connection and retry.", null);
+        } catch (JSONException ex) {
+            Log.e("ElevateAuth", "Elevate authentication payload or response was invalid", ex);
+            showNativeResult(mode, false, "Elevate returned an unreadable sign-in response. Please retry; if it persists, share this message with support.", null);
+        } catch (RuntimeException ex) {
+            Log.e("ElevateAuth", "Unexpected native authentication failure", ex);
+            showNativeResult(mode, false, "Sign-in failed unexpectedly (" + ex.getClass().getSimpleName() + "). Please retry.", null);
         }
     }
 
@@ -306,7 +327,7 @@ public class MainActivity extends Activity {
         List<String> setCookies = new ArrayList<>();
     }
 
-    private Response postForm(String url, JSONObject data, String cookie) throws Exception {
+    private Response postForm(String url, JSONObject data, String cookie) throws IOException {
         StringBuilder encoded = new StringBuilder();
         java.util.Iterator<String> keys = data.keys();
         while (keys.hasNext()) {
@@ -318,11 +339,11 @@ public class MainActivity extends Activity {
         return request(url, encoded.toString(), "application/x-www-form-urlencoded; charset=UTF-8", cookie);
     }
 
-    private Response postJson(String url, JSONObject data, String cookie) throws Exception {
+    private Response postJson(String url, JSONObject data, String cookie) throws IOException {
         return request(url, data.toString(), "application/json; charset=UTF-8", cookie);
     }
 
-    private Response request(String url, String body, String contentType, String cookie) throws Exception {
+    private Response request(String url, String body, String contentType, String cookie) throws IOException {
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setRequestMethod("POST");
         c.setConnectTimeout(12000);
