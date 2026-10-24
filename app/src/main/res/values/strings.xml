@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Elevate Option Trading</string>
+    <string name="app_name">Elevate</string>
     <!-- Replace this value with the same Google OAuth Web Client ID configured in Elevate Admin Settings. -->
     <string name="default_web_client_id">145218282145-eeut3t1f98om3j2r7iqn1b63si76ge3e.apps.googleusercontent.com</string>
     <string name="base_url">https://notrade.myelevateapps.com</string>

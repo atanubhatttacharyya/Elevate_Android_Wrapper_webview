@@ -28,3 +28,26 @@ workflows:
           gradle --no-daemon bundleRelease
     artifacts:
       - app/build/outputs/bundle/release/*.aab
+
+  android-release-apk:
+    name: Elevate Android WebView Signed Release APK
+    max_build_duration: 30
+    instance_type: mac_mini_m2
+    environment:
+      java: 17
+      android_signing:
+        - elevate_release_key
+    scripts:
+      - name: Verify persistent release signing key
+        script: |
+          set -euo pipefail
+          : "${CM_KEYSTORE_PATH:?Upload a persistent keystore and set CM_KEYSTORE_PATH}"
+          : "${CM_KEYSTORE_PASSWORD:?Set CM_KEYSTORE_PASSWORD as a secure variable}"
+          : "${CM_KEY_ALIAS:?Set CM_KEY_ALIAS as a secure variable}"
+          : "${CM_KEY_PASSWORD:?Set CM_KEY_PASSWORD as a secure variable}"
+          test -f "$CM_KEYSTORE_PATH"
+      - name: Build signed release APK
+        script: |
+          gradle --no-daemon assembleRelease
+    artifacts:
+      - app/build/outputs/apk/release/*.apk

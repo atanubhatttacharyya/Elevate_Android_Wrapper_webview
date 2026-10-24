@@ -13,11 +13,36 @@ Google blocks/limits Google Identity Services sign-in inside embedded WebViews. 
 4. Commit the contents of this folder to a new branch in `atanubhatttacharyya/twa_android_wrapper` (or build from a separate branch/repository). The Codemagic workflow can use the existing Gradle build configuration; build with `gradle --no-daemon assembleDebug`.
 5. Install and test the new APK. Do not overwrite the working APK until native Google sign-in, login, registration, account modification, session handling, and sign-out have been tested.
 
+## Signed release APK for sideloading
+
+Play Store publication is not required. The `android-release-apk` workflow builds
+a signed release APK for direct installation. It requires one persistent Android
+keystore; no keystore is currently included in this project.
+
+1. Create a keystore once with Android Studio's signing tools or Java `keytool`.
+   Codemagic does not generate the keystore. Keep a secure backup; do not commit
+   the keystore or passwords to this repo.
+2. In Codemagic Team settings, upload the keystore under **Code signing
+   identities → Android keystores** and set its reference name to exactly
+   `elevate_release_key`. Codemagic supplies the signing environment variables
+   referenced by this workflow.
+3. Run the `android-release-apk` workflow. It checks that the signing identity
+   is available, then builds `app/build/outputs/apk/release/*.apk`.
+4. Register the release certificate's SHA-1 in the Android OAuth client for
+   `com.elevate.optiontrading`. Debug and release builds have different
+   certificates unless explicitly signed with the same key.
+
+Keep using this same keystore for every future release update. Android will
+reject an update signed with a different key. A release-signed APK also cannot
+update an installed debug APK; uninstalling the debug version may be required
+and clears its local app data. A signed APK does not guarantee Play Protect will
+show no warning.
+
 ## Important implementation notes
 
 - Website: `https://notrade.myelevateapps.com`
 - Android application ID: `com.elevate.optiontrading`
-- App label: `Elevate Option Trading`
+- App label: `Elevate`
 - Minimum SDK: 23; compile/target SDK: 35; Java 17.
 - The wrapper calls the existing server endpoints `/login`, `/auth/google/register`, `/auth/google/modify/verify`, and `/auth/google/modify/update` using the Google ID token. It transfers the returned Elevate session cookie into the WebView for login.
 - The wrapper does not change AWS or Flask code.

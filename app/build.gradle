@@ -2,6 +2,17 @@ plugins {
     id 'com.android.application'
 }
 
+def releaseKeyStorePath = System.getenv('CM_KEYSTORE_PATH')
+def releaseKeyStorePassword = System.getenv('CM_KEYSTORE_PASSWORD')
+def releaseKeyAlias = System.getenv('CM_KEY_ALIAS')
+def releaseKeyPassword = System.getenv('CM_KEY_PASSWORD')
+def releaseSigningConfigured = [
+        releaseKeyStorePath,
+        releaseKeyStorePassword,
+        releaseKeyAlias,
+        releaseKeyPassword
+].every { value -> value != null && !value.trim().isEmpty() }
+
 android {
     namespace 'com.elevate.optiontrading'
     compileSdk 35
@@ -12,6 +23,25 @@ android {
         targetSdk 35
         versionCode 2
         versionName '2.0.0-webview'
+    }
+
+    signingConfigs {
+        if (releaseSigningConfigured) {
+            release {
+                storeFile file(releaseKeyStorePath)
+                storePassword releaseKeyStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            if (releaseSigningConfigured) {
+                signingConfig signingConfigs.release
+            }
+        }
     }
 
     compileOptions {
