@@ -200,7 +200,8 @@ public class MainActivity extends Activity {
             final String token = account.getIdToken();
             final String mode = pendingMode;
             final JSONObject payload = new JSONObject(pendingPayload.toString());
-            network.execute(() -> processGoogleAuth(mode, payload, token));
+            final String cookie = CookieManager.getInstance().getCookie(BASE_URL);
+            network.execute(() -> processGoogleAuth(mode, payload, token, cookie));
         } catch (ApiException ex) {
             String message = ex.getStatusCode() == CommonStatusCodes.DEVELOPER_ERROR
                     ? "Google sign-in configuration error. Register package " + getPackageName()
@@ -208,8 +209,11 @@ public class MainActivity extends Activity {
                             + getSigningCertificateSha1()
                     : "Google sign-in was cancelled or failed (code " + ex.getStatusCode() + "). Check Google Play Services and the OAuth client configuration, then try again.";
             showNativeResult(pendingMode, false, message, null);
-        } catch (Exception ex) {
-            showNativeResult(pendingMode, false, "Google sign-in could not be completed. Please try again.", null);
+        } catch (JSONException ex) {
+            Log.e("ElevateAuth", "Unable to prepare the Google sign-in result", ex);
+            showNativeResult(pendingMode, false, "Unable to prepare the Google sign-in result (JSON error). Please retry.", null);
+        } catch (RuntimeException ex) {
+            showNativeResult(pendingMode, false, runtimeFailureMessage("returning from Google sign-in", ex), null);
         }
     }
 
@@ -240,30 +244,35 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void processGoogleAuth(String mode, JSONObject payload, String credential) {
+    private void processGoogleAuth(String mode, JSONObject payload, String credential, String initialCookie) {
+        String stage = "preparing the Elevate request";
         try {
-            String cookie = CookieManager.getInstance().getCookie(BASE_URL);
+            String cookie = initialCookie;
             if ("login".equals(mode)) {
                 JSONObject form = new JSONObject();
                 form.put("username", payload.optString("username"));
                 form.put("credential", credential);
                 form.put("public_home", "1");
                 form.put("next", "/home");
+                stage = "sending the login request to Elevate";
                 Response r = postForm(BASE_URL + "/login", form, cookie);
                 cookie = applyResponseCookies(r, cookie);
                 if (r.location != null && !r.location.isEmpty()) {
                     final String next = absoluteUrl(r.location);
                     final String finalCookie = cookie;
+                    stage = "restoring the Elevate session in the app";
                     setCookiesThen(finalCookie, () -> webView.post(() -> webView.loadUrl(next)));
                 } else if (r.status >= 200 && r.status < 300 && r.body != null && r.body.contains("google-login-form")) {
                     final String html = r.body;
                     final String finalCookie = cookie;
+                    stage = "restoring the Elevate login response in the app";
                     setCookiesThen(finalCookie, () -> webView.post(() -> webView.loadDataWithBaseURL(BASE_URL + "/", html, "text/html", "UTF-8", null)));
                 } else {
                     showNativeResult(mode, false, extractMessage(r.body, "Sign-in failed. Please check your account details and try again."), null);
                 }
             } else if ("register".equals(mode)) {
                 payload.put("credential", credential);
+                stage = "sending the registration request to Elevate";
                 Response r = postJson(BASE_URL + "/auth/google/register", payload, cookie);
                 cookie = applyResponseCookies(r, cookie);
                 JSONObject result = parseJson(r.body);
@@ -273,6 +282,7 @@ public class MainActivity extends Activity {
                 JSONObject verify = new JSONObject();
                 verify.put("identifier", payload.optString("identifier"));
                 verify.put("credential", credential);
+                stage = "verifying the account with Elevate";
                 Response vr = postJson(BASE_URL + "/auth/google/modify/verify", verify, cookie);
                 cookie = applyResponseCookies(vr, cookie);
                 JSONObject vd = parseJson(vr.body);
@@ -282,6 +292,7 @@ public class MainActivity extends Activity {
                 }
                 JSONObject update = new JSONObject(payload.toString());
                 update.put("credential", credential);
+                stage = "saving account changes with Elevate";
                 Response ur = postJson(BASE_URL + "/auth/google/modify/update", update, cookie);
                 cookie = applyResponseCookies(ur, cookie);
                 JSONObject ud = parseJson(ur.body);
@@ -316,8 +327,21 @@ public class MainActivity extends Activity {
             showNativeResult(mode, false, "Elevate returned an unreadable sign-in response. Please retry; if it persists, share this message with support.", null);
         } catch (RuntimeException ex) {
             Log.e("ElevateAuth", "Unexpected native authentication failure", ex);
-            showNativeResult(mode, false, "Sign-in failed unexpectedly (" + ex.getClass().getSimpleName() + "). Please retry.", null);
+            showNativeResult(mode, false, runtimeFailureMessage(stage, ex), null);
         }
+    }
+
+    private String runtimeFailureMessage(String stage, RuntimeException ex) {
+        Log.e("ElevateAuth", "Native authentication failed while " + stage, ex);
+        String detail = ex.getMessage();
+        if (detail == null || detail.trim().isEmpty()) {
+            detail = "no additional detail";
+        } else {
+            detail = detail.replaceAll("[\\r\\n]+", " ").trim();
+            if (detail.length() > 160) detail = detail.substring(0, 160) + "...";
+        }
+        return "Sign-in failed while " + stage + " (" + ex.getClass().getSimpleName()
+                + "): " + detail;
     }
 
     private static class Response {
@@ -397,29 +421,41 @@ public class MainActivity extends Activity {
     }
 
     private void setCookiesThen(String cookieHeader, Runnable action) {
-        if (cookieHeader == null || cookieHeader.trim().isEmpty()) { runOnUiThread(action); return; }
-        String[] pairs = cookieHeader.split(";\\s*");
-        List<String> names = new ArrayList<>();
-        for (String pair : pairs) {
-            if (pair.trim().isEmpty()) continue;
-            int eq = pair.indexOf('=');
-            if (eq < 1) continue;
-            names.add(pair.trim());
-        }
-        if (names.isEmpty()) { runOnUiThread(action); return; }
-        CookieManager cm = CookieManager.getInstance();
-        final int[] remaining = { names.size() };
-        for (String pair : names) {
-            cm.setCookie(BASE_URL, pair, value -> {
-                synchronized (remaining) {
-                    remaining[0]--;
-                    if (remaining[0] == 0) {
-                        cm.flush();
-                        runOnUiThread(action);
+        runOnUiThread(() -> {
+            if (cookieHeader == null || cookieHeader.trim().isEmpty()) {
+                action.run();
+                return;
+            }
+            String[] pairs = cookieHeader.split(";\\s*");
+            List<String> names = new ArrayList<>();
+            for (String pair : pairs) {
+                if (pair.trim().isEmpty()) continue;
+                int eq = pair.indexOf('=');
+                if (eq < 1) continue;
+                names.add(pair.trim());
+            }
+            if (names.isEmpty()) {
+                action.run();
+                return;
+            }
+            CookieManager cm = CookieManager.getInstance();
+            final int[] remaining = { names.size() };
+            for (String pair : names) {
+                cm.setCookie(BASE_URL, pair, value -> {
+                    boolean complete;
+                    synchronized (remaining) {
+                        remaining[0]--;
+                        complete = remaining[0] == 0;
                     }
-                }
-            });
-        }
+                    if (complete) {
+                        runOnUiThread(() -> {
+                            cm.flush();
+                            action.run();
+                        });
+                    }
+                });
+            }
+        });
     }
 
     private String absoluteUrl(String location) {
