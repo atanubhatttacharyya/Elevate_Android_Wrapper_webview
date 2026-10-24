@@ -1,3 +1,4 @@
+
 workflows:
   android-debug:
     name: Elevate Android WebView Debug APK
@@ -29,31 +30,27 @@ workflows:
     artifacts:
       - app/build/outputs/bundle/release/*.aab
 
-  generate-release-keystore-once:
-    name: Generate Elevate Release Keystore - One Time Only
+  android-release-apk:
+    name: Elevate Android WebView Signed Release APK
     max_build_duration: 30
     instance_type: mac_mini_m2
     environment:
       java: 17
-      groups:
-        - elevate
+      android_signing:
+        - elevate_release_key
     scripts:
-      - name: Generate permanent keystore
+      - name: Verify release signing configuration
         script: |
           set -euo pipefail
-          mkdir -p "$CM_BUILD_DIR/keystore"
-          keytool -genkeypair \
-            -keystore "$CM_BUILD_DIR/keystore/elevate-release.jks" \
-            -storetype JKS \
-            -alias elevate_release_key \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -dname "CN=Elevate Android Release, OU=Mobile, O=Elevate, L=Kolkata, ST=West Bengal, C=IN" \
-            -storepass "$ELEVATE_KEYSTORE_PASSWORD" \
-            -keypass "$ELEVATE_KEY_PASSWORD"
-          keytool -list \
-            -keystore "$CM_BUILD_DIR/keystore/elevate-release.jks" \
-            -storepass "$ELEVATE_KEYSTORE_PASSWORD"
+          test -n "${CM_KEYSTORE_PATH:-}"
+          test -f "$CM_KEYSTORE_PATH"
+          test -n "${CM_KEYSTORE_PASSWORD:-}"
+          test -n "${CM_KEY_ALIAS:-}"
+          test -n "${CM_KEY_PASSWORD:-}"
+      - name: Build signed release APK
+        script: |
+          gradle --no-daemon assembleRelease
     artifacts:
-      - keystore/elevate-release.jks
+      - app/build/outputs/apk/release/*.apk
+
+
