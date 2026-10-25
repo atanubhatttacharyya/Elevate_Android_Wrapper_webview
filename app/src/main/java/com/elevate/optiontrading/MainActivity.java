@@ -152,13 +152,13 @@ public class MainActivity extends Activity {
         String js = "(function(){if(window.__elevateNativeAuthHook)return;window.__elevateNativeAuthHook=true;"
                 + "document.querySelectorAll('.google-slot').forEach(function(slot){var strip=function(){slot.querySelectorAll('iframe').forEach(function(frame){frame.remove();});};strip();if(window.MutationObserver)new MutationObserver(strip).observe(slot,{childList:true,subtree:true});});"
                 + "var originalFetch=window.fetch;if(originalFetch){window.fetch=function(input,init){var rawUrl=typeof input==='string'?input:(input&&input.url)||'',method=String((init&&init.method)||(input&&input.method)||'GET').toUpperCase();return originalFetch.apply(this,arguments).then(function(response){try{var u=new URL(rawUrl,location.href);if(u.origin===location.origin&&u.pathname==='/logout'&&method==='POST'&&response.ok){response.clone().json().then(function(data){if(data&&data.logged_out===true&&window.ElevateNative)window.ElevateNative.onLogout();}).catch(function(error){console.error('Could not confirm Elevate logout response',error);});}}catch(error){console.error('Could not process Elevate logout response',error);}return response;});};}"
-                + "window.ElevateNativeResult={done:function(mode,ok,message,profile){try{"
-                + "if(mode==='login'){var s=document.getElementById('login-google-status'),b=document.getElementById('login-submit');if(s)s.textContent=message|| (ok?'Google sign-in completed.':'Google sign-in failed.');if(b)b.disabled=true;}"
+                + "window.ElevateNativeResult={loginVerified:function(credential,profile){try{var f=document.getElementById('google-login-form'),c=document.getElementById('login-credential'),b=document.getElementById('login-submit'),s=document.getElementById('login-google-status');if(c)c.value=credential||'';if(b)b.disabled=!credential;if(s)s.textContent='Gmail verified. Sign in is ready.';var p=document.getElementById('modify-profile-form'),summary=document.getElementById('modify-profile-summary'),empty=document.getElementById('modify-empty-state');if(profile&&p){['username','email','first_name','last_name','phone','pincode'].forEach(function(k){var el=p.elements.namedItem(k);if(el&&profile[k]!=null)el.value=profile[k];});var n=document.getElementById('modify-summary-name'),em=document.getElementById('modify-summary-email'),ph=document.getElementById('modify-summary-phone');if(n)n.textContent=[profile.first_name,profile.last_name].filter(Boolean).join(' ')||profile.username||'';if(em)em.textContent=profile.email||'';if(ph)ph.textContent=profile.phone?'+91 '+profile.phone:'';p.hidden=true;if(summary)summary.hidden=false;if(empty)empty.hidden=true;var edit=document.getElementById('modify-edit-toggle');if(edit)edit.hidden=false;var ms=document.getElementById('modify-status');if(ms)ms.textContent='Account details loaded.';}}catch(e){console.error(e);}},done:function(mode,ok,message,profile){try{"
+                + "if(mode==='login'){var s=document.getElementById('login-google-status'),b=document.getElementById('login-submit'),c=document.getElementById('login-credential');if(s)s.textContent=message|| (ok?'Gmail verified. Sign in is ready.':'Google sign-in failed.');if(!ok&&b)b.disabled=true;if(!ok&&c)c.value='';}"
                 + "else if(mode==='register'){var e=document.getElementById('reg-error'),s=document.getElementById('reg-email-status');if(e){e.hidden=!!ok;e.textContent=ok?'':(message||'Google verification failed.');}if(s){s.dataset.submissionMessage='true';s.textContent=message|| (ok?'Registration complete.':'Google verification failed.');}}"
                 + "else if(mode==='modify'){var s=document.getElementById('modify-status'),f=document.getElementById('modify-profile-form'),sum=document.getElementById('modify-profile-summary'),empty=document.getElementById('modify-empty-state');if(s)s.textContent=message|| (ok?'Account details updated.':'Could not update account.');if(ok&&profile&&f){['username','email','first_name','last_name','phone','pincode'].forEach(function(k){var el=f.elements.namedItem(k);if(el&&profile[k]!=null)el.value=profile[k];});f.hidden=true;if(sum)sum.hidden=false;if(empty)empty.hidden=true;var n=document.getElementById('modify-summary-name'),em=document.getElementById('modify-summary-email'),ph=document.getElementById('modify-summary-phone');if(n)n.textContent=((profile.first_name||'')+' '+(profile.last_name||'')).trim();if(em)em.textContent=profile.email||'';if(ph)ph.textContent=profile.phone||'';}}"
                 + "}catch(e){console.error(e);}}};"
                 + "document.addEventListener('pointerdown',function(ev){var t=ev.target;var slot=t&&t.closest?t.closest('.google-slot'):null;if(!slot)return;var id=slot.id,mode=id==='google-login-button'?'login':id==='google-register-button'?'register':id==='google-modify-save-button'?'modify':'';if(!mode)return;var payload={};"
-                + "if(mode==='login'){var lf=document.getElementById('google-login-form');if(!lf||!lf.reportValidity())return;payload.username=lf.elements.namedItem('username').value.trim();if(!payload.username)return;}"
+                + "if(mode==='login'){var lf=document.getElementById('google-login-form');if(!lf||!lf.reportValidity())return;payload.username=lf.elements.namedItem('username').value.trim();if(!payload.username)return;var lc=document.getElementById('login-credential'),lb=document.getElementById('login-submit'),ls=document.getElementById('login-google-status');if(lc)lc.value='';if(lb)lb.disabled=true;if(ls)ls.textContent='Waiting for Gmail verification…';}"
                 + "if(mode==='register'){var rf=document.getElementById('public-reg-form');if(!rf||!rf.reportValidity())return;payload.username=rf.elements.namedItem('username').value.trim();payload.first_name=rf.elements.namedItem('first_name').value.trim();payload.last_name=rf.elements.namedItem('last_name').value.trim();payload.phone=rf.elements.namedItem('phone').value.trim();payload.email=rf.elements.namedItem('email').value.trim();payload.pincode=rf.elements.namedItem('pincode').value.trim();payload.accept_terms=document.getElementById('reg-accept-terms').checked?'1':'0';payload.accept_privacy=document.getElementById('reg-accept-privacy').checked?'1':'0';}"
                 + "if(mode==='modify'){var mf=document.getElementById('modify-profile-form'),lf=document.getElementById('google-login-form');if(!mf||mf.hidden||!mf.reportValidity())return;payload.identifier=lf?lf.elements.namedItem('username').value.trim():'';payload.username=mf.elements.namedItem('username').value.trim();payload.email=mf.elements.namedItem('email').value.trim();payload.first_name=mf.elements.namedItem('first_name').value.trim();payload.last_name=mf.elements.namedItem('last_name').value.trim();payload.phone=mf.elements.namedItem('phone').value.trim();payload.pincode=mf.elements.namedItem('pincode').value.trim();if(!payload.identifier){var st=document.getElementById('modify-edit-status');if(st)st.textContent='Enter your User ID, email or mobile number in the sign-in panel first.';return;}}"
                 + "ev.preventDefault();ev.stopPropagation();if(ev.stopImmediatePropagation)ev.stopImmediatePropagation();if(window.ElevateNative)window.ElevateNative.startGoogleSignIn(mode,JSON.stringify(payload));},true);})();";
@@ -277,26 +277,21 @@ public class MainActivity extends Activity {
         try {
             String cookie = initialCookie;
             if ("login".equals(mode)) {
-                JSONObject form = new JSONObject();
-                form.put("username", payload.optString("username"));
-                form.put("credential", credential);
-                form.put("public_home", "1");
-                form.put("next", "/home");
-                stage = "sending the login request to Elevate";
-                Response r = postForm(BASE_URL + "/login", form, cookie);
+                JSONObject verification = new JSONObject();
+                verification.put("identifier", payload.optString("username"));
+                verification.put("credential", credential);
+                stage = "verifying the Google account with Elevate";
+                Response r = postJson(BASE_URL + "/auth/google/modify/verify", verification, cookie);
                 cookie = applyResponseCookies(r, cookie);
-                if (r.location != null && !r.location.isEmpty()) {
-                    final String next = absoluteUrl(r.location);
+                JSONObject result = parseJson(r.body);
+                JSONObject profile = result.optJSONObject("profile");
+                if (r.status >= 200 && r.status < 300 && result.optBoolean("success", false) && profile != null) {
                     final String finalCookie = cookie;
-                    stage = "restoring the Elevate session in the app";
-                    setCookiesThen(finalCookie, () -> webView.post(() -> webView.loadUrl(next)));
-                } else if (r.status >= 200 && r.status < 300 && r.body != null && r.body.contains("google-login-form")) {
-                    final String html = r.body;
-                    final String finalCookie = cookie;
-                    stage = "restoring the Elevate login response in the app";
-                    setCookiesThen(finalCookie, () -> webView.post(() -> webView.loadDataWithBaseURL(BASE_URL + "/", html, "text/html", "UTF-8", null)));
+                    setCookiesThen(finalCookie, () -> showNativeLoginVerified(credential, profile));
                 } else {
-                    showNativeResult(mode, false, extractMessage(r.body, "Sign-in failed. Please check your account details and try again."), null);
+                    showNativeResult(mode, false,
+                            result.optString("message", "Google verification failed. Please check the account details and try again."),
+                            null);
                 }
             } else if ("register".equals(mode)) {
                 payload.put("credential", credential);
@@ -370,6 +365,19 @@ public class MainActivity extends Activity {
         }
         return "Sign-in failed while " + stage + " (" + ex.getClass().getSimpleName()
                 + "): " + detail;
+    }
+
+    private void showNativeLoginVerified(String credential, JSONObject profile) {
+        runOnUiThread(() -> {
+            try {
+                String js = "window.ElevateNativeResult&&window.ElevateNativeResult.loginVerified("
+                        + JSONObject.quote(credential) + "," + profile.toString() + ");";
+                webView.evaluateJavascript(js, null);
+            } catch (RuntimeException ex) {
+                Log.e("ElevateAuth", "Could not return verified Google identity to the sign-in form", ex);
+                showNativeResult("login", false, runtimeFailureMessage("preparing the Sign in button", ex), null);
+            }
+        });
     }
 
     private static class Response {

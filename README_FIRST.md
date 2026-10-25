@@ -44,7 +44,8 @@ show no warning.
 - Android application ID: `com.elevate.optiontrading`
 - App label: `Elevate`
 - Minimum SDK: 23; compile/target SDK: 35; Java 17.
-- The wrapper calls the existing server endpoints `/login`, `/auth/google/register`, `/auth/google/modify/verify`, and `/auth/google/modify/update` using the Google ID token. It transfers the returned Elevate session cookie into the WebView for login.
+- Native Gmail selection verifies the account with `/auth/google/modify/verify`, fills the verified credential into the existing sign-in form, and enables its **Sign in** button. It does not submit `/login` automatically; the user must explicitly tap **Sign in**. The verified profile is also shown in Modify Account Details, where edits remain an explicit user action.
+- The wrapper calls the existing server endpoints `/login`, `/auth/google/register`, `/auth/google/modify/verify`, and `/auth/google/modify/update` using the Google ID token. The `/login` form submission occurs only after the user taps **Sign in**.
 - On a successful `/logout` response, the WebView notifies the native wrapper; the wrapper signs out of Google Play Services and clears the Elevate session token from WebView storage so a later sign-in can choose another Google account.
 - The wrapper does not change AWS or Flask code.
 - Google OAuth configuration and Android signing fingerprints must be correct for the native Google sign-in flow to work.
