@@ -47,6 +47,7 @@ show no warning.
 - Native Gmail selection verifies the account with `/auth/google/modify/verify`, fills the verified credential into the existing sign-in form, and enables its **Sign in** button. It does not submit `/login` automatically; the user must explicitly tap **Sign in**. The verified profile is also shown in Modify Account Details, where edits remain an explicit user action.
 - The wrapper calls the existing server endpoints `/login`, `/auth/google/register`, `/auth/google/modify/verify`, and `/auth/google/modify/update` using the Google ID token. The `/login` form submission occurs only after the user taps **Sign in**.
 - On a successful `/logout` response, the WebView notifies the native wrapper; the wrapper signs out of Google Play Services and clears the Elevate session token from WebView storage so a later sign-in can choose another Google account.
+- On narrow screens, the wrapper overrides the Market/Capital shell's horizontally scrolling top-bar action row with a wrapped, non-scrolling touch layout so the header controls remain tappable.
 - The wrapper does not change AWS or Flask code.
 - Google OAuth configuration and Android signing fingerprints must be correct for the native Google sign-in flow to work.
 - This source ZIP has not been built in Codemagic or tested on a physical phone in this environment. Test it on a separate build before replacing the current app.
