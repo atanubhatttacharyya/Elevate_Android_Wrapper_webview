@@ -45,6 +45,7 @@ show no warning.
 - App label: `Elevate`
 - Minimum SDK: 23; compile/target SDK: 35; Java 17.
 - The wrapper calls the existing server endpoints `/login`, `/auth/google/register`, `/auth/google/modify/verify`, and `/auth/google/modify/update` using the Google ID token. It transfers the returned Elevate session cookie into the WebView for login.
+- On a successful `/logout` response, the WebView notifies the native wrapper; the wrapper signs out of Google Play Services and clears the Elevate session token from WebView storage so a later sign-in can choose another Google account.
 - The wrapper does not change AWS or Flask code.
 - Google OAuth configuration and Android signing fingerprints must be correct for the native Google sign-in flow to work.
 - This source ZIP has not been built in Codemagic or tested on a physical phone in this environment. Test it on a separate build before replacing the current app.

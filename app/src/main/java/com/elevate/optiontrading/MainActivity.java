@@ -151,6 +151,7 @@ public class MainActivity extends Activity {
     private void installNativeGoogleBridge() {
         String js = "(function(){if(window.__elevateNativeAuthHook)return;window.__elevateNativeAuthHook=true;"
                 + "document.querySelectorAll('.google-slot').forEach(function(slot){var strip=function(){slot.querySelectorAll('iframe').forEach(function(frame){frame.remove();});};strip();if(window.MutationObserver)new MutationObserver(strip).observe(slot,{childList:true,subtree:true});});"
+                + "var originalFetch=window.fetch;if(originalFetch){window.fetch=function(input,init){var rawUrl=typeof input==='string'?input:(input&&input.url)||'',method=String((init&&init.method)||(input&&input.method)||'GET').toUpperCase();return originalFetch.apply(this,arguments).then(function(response){try{var u=new URL(rawUrl,location.href);if(u.origin===location.origin&&u.pathname==='/logout'&&method==='POST'&&response.ok){response.clone().json().then(function(data){if(data&&data.logged_out===true&&window.ElevateNative)window.ElevateNative.onLogout();}).catch(function(error){console.error('Could not confirm Elevate logout response',error);});}}catch(error){console.error('Could not process Elevate logout response',error);}return response;});};}"
                 + "window.ElevateNativeResult={done:function(mode,ok,message,profile){try{"
                 + "if(mode==='login'){var s=document.getElementById('login-google-status'),b=document.getElementById('login-submit');if(s)s.textContent=message|| (ok?'Google sign-in completed.':'Google sign-in failed.');if(b)b.disabled=true;}"
                 + "else if(mode==='register'){var e=document.getElementById('reg-error'),s=document.getElementById('reg-email-status');if(e){e.hidden=!!ok;e.textContent=ok?'':(message||'Google verification failed.');}if(s){s.dataset.submissionMessage='true';s.textContent=message|| (ok?'Registration complete.':'Google verification failed.');}}"
@@ -165,6 +166,20 @@ public class MainActivity extends Activity {
     }
 
     private class NativeBridge {
+        @JavascriptInterface public void onLogout() {
+            runOnUiThread(() -> {
+                pendingMode = "";
+                pendingPayload = new JSONObject();
+                googleSignInClient.signOut().addOnCompleteListener(MainActivity.this, task -> {
+                    if (!task.isSuccessful()) {
+                        Log.e("ElevateAuth", "Google Sign-In state could not be cleared after Elevate logout",
+                                task.getException());
+                    }
+                    clearElevateWebAuthState();
+                });
+            });
+        }
+
         @JavascriptInterface public void startGoogleSignIn(String mode, String payloadJson) {
             runOnUiThread(() -> {
                 String webClientId = getString(R.string.default_web_client_id).trim();
@@ -185,6 +200,19 @@ public class MainActivity extends Activity {
                 }
             });
         }
+    }
+
+    private void clearElevateWebAuthState() {
+        runOnUiThread(() -> {
+            CookieManager.getInstance().flush();
+            if (webView != null) {
+                webView.evaluateJavascript(
+                        "try{sessionStorage.removeItem('elevate_session_token');"
+                                + "localStorage.removeItem('elevate_session_token');"
+                                + "window.ELEVATE_SESSION_TOKEN='';}catch(e){console.error(e);}",
+                        null);
+            }
+        });
     }
 
     @Override @SuppressWarnings("deprecation")
