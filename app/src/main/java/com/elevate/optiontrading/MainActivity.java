@@ -1,6 +1,9 @@
 package com.elevate.optiontrading;
 
 import android.app.Activity;
+import android.app.Dialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -8,7 +11,9 @@ import android.content.pm.Signature;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Message;
 import android.view.View;
+import android.view.ViewGroup;
 import android.util.Log;
 import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
@@ -17,8 +22,11 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.WebView.WebViewTransport;
 import android.widget.ProgressBar;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 import android.view.Gravity;
 import android.graphics.Color;
@@ -61,6 +69,10 @@ public class MainActivity extends Activity {
     private static final String BASE_URL = "https://notrade.myelevateapps.com";
 
     private WebView webView;
+    private Dialog brokerLoginDialog;
+    private WebView brokerLoginWebView;
+    private TextView brokerLoginAddress;
+    private TextView brokerLoginCopy;
     private ProgressBar progressBar;
     private GoogleSignInClient googleSignInClient;
     private final ExecutorService network = Executors.newSingleThreadExecutor();
@@ -97,7 +109,7 @@ public class MainActivity extends Activity {
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
         settings.setJavaScriptCanOpenWindowsAutomatically(false);
-        settings.setSupportMultipleWindows(false);
+        settings.setSupportMultipleWindows(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
@@ -107,6 +119,12 @@ public class MainActivity extends Activity {
             @Override public void onProgressChanged(WebView view, int progress) {
                 progressBar.setProgress(progress);
                 progressBar.setVisibility(progress >= 100 ? View.GONE : View.VISIBLE);
+            }
+            @Override public boolean onCreateWindow(WebView view, boolean isDialog,
+                    boolean isUserGesture, Message resultMsg) {
+                if (!isUserGesture) return false;
+                showBrokerLoginWindow(resultMsg);
+                return true;
             }
         });
         webView.setWebViewClient(new WebViewClient() {
@@ -140,6 +158,195 @@ public class MainActivity extends Activity {
     }
 
     private int dp(int value) { return (int) (value * getResources().getDisplayMetrics().density + 0.5f); }
+
+    private void showBrokerLoginWindow(Message resultMsg) {
+        closeBrokerLoginWindow();
+
+        Dialog dialog = new Dialog(this);
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setBackgroundColor(Color.rgb(7, 17, 29));
+
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(dp(16), 0, dp(8), 0);
+        header.setBackgroundColor(Color.rgb(12, 31, 49));
+        TextView title = new TextView(this);
+        title.setText("Elevate · Broker login");
+        title.setTextColor(Color.WHITE);
+        title.setTextSize(15);
+        header.addView(title, new LinearLayout.LayoutParams(
+                0, dp(52), 1));
+        TextView close = new TextView(this);
+        close.setText("Close");
+        close.setTextColor(Color.rgb(244, 193, 90));
+        close.setTextSize(14);
+        close.setGravity(Gravity.CENTER);
+        close.setPadding(dp(12), 0, dp(12), 0);
+        close.setOnClickListener(v -> closeBrokerLoginWindow());
+        header.addView(close, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(52)));
+        content.addView(header, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(52)));
+
+        LinearLayout addressRow = new LinearLayout(this);
+        addressRow.setGravity(Gravity.CENTER_VERTICAL);
+        addressRow.setPadding(dp(10), 0, dp(8), 0);
+        addressRow.setBackgroundColor(Color.rgb(5, 13, 22));
+        TextView address = new TextView(this);
+        address.setTextColor(Color.rgb(190, 207, 223));
+        address.setTextSize(10);
+        address.setSingleLine(true);
+        address.setTextIsSelectable(true);
+        address.setHorizontallyScrolling(true);
+        address.setText("Waiting for ICICI Direct login…");
+        addressRow.addView(address, new LinearLayout.LayoutParams(
+                0, dp(42), 1));
+        TextView copy = new TextView(this);
+        copy.setText("Copy URL");
+        copy.setTextColor(Color.rgb(244, 193, 90));
+        copy.setTextSize(12);
+        copy.setGravity(Gravity.CENTER);
+        copy.setPadding(dp(10), 0, dp(10), 0);
+        copy.setOnClickListener(v -> copyBrokerLoginValue());
+        addressRow.addView(copy, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(42)));
+        content.addView(addressRow, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(42)));
+
+        WebView popup = new WebView(this);
+        WebSettings settings = popup.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setDatabaseEnabled(true);
+        settings.setJavaScriptCanOpenWindowsAutomatically(false);
+        settings.setSupportMultipleWindows(false);
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        settings.setAllowFileAccess(false);
+        settings.setAllowContentAccess(false);
+        settings.setUserAgentString(
+                settings.getUserAgentString() + " ElevateAndroidWebView/2.0");
+        popup.setWebViewClient(new WebViewClient() {
+            @Override public void onPageStarted(WebView view, String url, Bitmap favicon) {
+                updateBrokerLoginAddress(url);
+            }
+            @Override public void onPageFinished(WebView view, String url) {
+                updateBrokerLoginAddress(url);
+            }
+            @Override public boolean shouldOverrideUrlLoading(
+                    WebView view, WebResourceRequest request) {
+                String url = request.getUrl().toString();
+                return isElevateOrKiteLoginUrl(url) ? false : routeUrl(url);
+            }
+            @Override public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                return isElevateOrKiteLoginUrl(url) ? false : routeUrl(url);
+            }
+        });
+        popup.setWebChromeClient(new WebChromeClient() {
+            @Override public void onCloseWindow(WebView window) {
+                closeBrokerLoginWindow();
+            }
+        });
+        content.addView(popup, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
+        dialog.setContentView(content);
+        dialog.setOnDismissListener(ignored -> destroyBrokerLoginWindow(popup));
+
+        brokerLoginDialog = dialog;
+        brokerLoginWebView = popup;
+        brokerLoginAddress = address;
+        brokerLoginCopy = copy;
+        WebViewTransport transport = (WebViewTransport) resultMsg.obj;
+        transport.setWebView(popup);
+        resultMsg.sendToTarget();
+        dialog.show();
+        if (dialog.getWindow() != null) {
+            int width = Math.min(getResources().getDisplayMetrics().widthPixels - dp(24), dp(520));
+            int height = (int) (getResources().getDisplayMetrics().heightPixels * 0.88f);
+            dialog.getWindow().setLayout(width, height);
+        }
+    }
+
+    private boolean isElevateOrKiteLoginUrl(String raw) {
+        Uri uri = Uri.parse(raw);
+        String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase();
+        String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase();
+        if (!"https".equals(scheme)) return false;
+        return host.equals("notrade.myelevateapps.com")
+                || host.equals("www.notrade.myelevateapps.com")
+                || host.equals("kite.zerodha.com")
+                || host.equals("icicidirect.com")
+                || host.endsWith(".icicidirect.com");
+    }
+
+    private void updateBrokerLoginAddress(String raw) {
+        if (brokerLoginAddress != null) brokerLoginAddress.setText(raw);
+        if (brokerLoginCopy != null) {
+            brokerLoginCopy.setText(findIciciApiSession(raw).isEmpty()
+                    ? "Copy URL" : "Copy Session");
+        }
+    }
+
+    private String findIciciApiSession(String raw) {
+        try {
+            Uri uri = Uri.parse(raw);
+            for (String name : uri.getQueryParameterNames()) {
+                String normalized = name.toLowerCase();
+                if (normalized.equals("api_session") || normalized.equals("apisession")
+                        || normalized.equals("session_token")) {
+                    String value = uri.getQueryParameter(name);
+                    if (value != null && !value.trim().isEmpty()) return value.trim();
+                }
+            }
+            String fragment = uri.getFragment();
+            if (fragment != null && fragment.contains("=")) {
+                Uri fragmentUri = Uri.parse("https://local.invalid/?" + fragment);
+                for (String name : fragmentUri.getQueryParameterNames()) {
+                    String normalized = name.toLowerCase();
+                    if (normalized.equals("api_session") || normalized.equals("apisession")
+                            || normalized.equals("session_token")) {
+                        String value = fragmentUri.getQueryParameter(name);
+                        if (value != null && !value.trim().isEmpty()) return value.trim();
+                    }
+                }
+            }
+        } catch (IllegalArgumentException ex) {
+            Log.w("ElevateBrokerLogin", "Could not read the broker login URL", ex);
+        }
+        return "";
+    }
+
+    private void copyBrokerLoginValue() {
+        WebView popup = brokerLoginWebView;
+        String currentUrl = popup == null ? "" : popup.getUrl();
+        if (currentUrl == null || currentUrl.isEmpty()) return;
+        String apiSession = findIciciApiSession(currentUrl);
+        String value = apiSession.isEmpty() ? currentUrl : apiSession;
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        if (clipboard == null) return;
+        clipboard.setPrimaryClip(ClipData.newPlainText(
+                apiSession.isEmpty() ? "ICICI login URL" : "ICICI API_Session", value));
+        Toast.makeText(this, apiSession.isEmpty()
+                ? "Login URL copied. Select the API_Session from it if needed."
+                : "ICICI API_Session copied. Close this window and paste it into Elevate.",
+                Toast.LENGTH_LONG).show();
+    }
+
+    private void closeBrokerLoginWindow() {
+        Dialog dialog = brokerLoginDialog;
+        brokerLoginDialog = null;
+        brokerLoginAddress = null;
+        brokerLoginCopy = null;
+        if (dialog != null && dialog.isShowing()) dialog.dismiss();
+    }
+
+    private void destroyBrokerLoginWindow(WebView popup) {
+        if (brokerLoginWebView == popup) brokerLoginWebView = null;
+        popup.stopLoading();
+        popup.setWebChromeClient(null);
+        popup.setWebViewClient(null);
+        popup.destroy();
+    }
 
     private boolean routeUrl(String raw) {
         try {

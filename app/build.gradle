@@ -21,8 +21,8 @@ android {
         applicationId 'com.elevate.optiontrading'
         minSdk 23
         targetSdk 35
-        versionCode 2
-        versionName '2.0.0-webview'
+        versionCode 3
+        versionName '2.0.1-webview'
     }
 
     signingConfigs {
